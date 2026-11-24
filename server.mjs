@@ -8,7 +8,7 @@ import QRCode from 'qrcode';
 import { Server } from 'socket.io';
 import PACKS from './packs.json' with { type: 'json' };
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const HERE = path.dirname(fileURLToPath(import.meta.url)); // не __dirname: Netlify объявляет его сам
 const PORT = +process.env.PORT || 3000;
 const T_WRITE = +process.env.T_WRITE || 45;   // секунд на ложь
 const T_VOTE = +process.env.T_VOTE || 30;     // секунд на голосование
@@ -17,7 +17,7 @@ const MAX_PLAYERS = 20;
 const PTS_TRUTH = 1000, PTS_FOOL = 500;
 
 const app = express();
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(HERE, 'public')));
 app.get('/', (_, res) => res.redirect('/host.html'));
 app.get('/health', (_, res) => res.send('ok'));
 app.get('/packs', (_, res) => res.json(Object.entries(PACKS).map(([id, p]) => ({ id, label: p.label, title: p.title, n: p.qs.length }))));
