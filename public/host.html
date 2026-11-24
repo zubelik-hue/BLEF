@@ -115,7 +115,7 @@ const chips=(f,kick)=>`<div class="chips">${S.players.map(p=>kick&&!p.bot?`<butt
 function render(){
   const s=S,qn=`Вопрос ${s.qi+1} из ${s.total}`;let h='';
   if(s.phase==='lobby'){const n=s.players.length;
-    h=`<div class="scene lobby"><div class="qr"><img src="${esc(s.qr)}" alt="QR-код для входа"></div><div><p class="url">Сканируйте QR-код или откройте<br>${esc(s.url.replace(/\?.*/,''))} — код комнаты <b>${esc(s.code)}</b></p><h2>${esc(s.title)}</h2>${n?chips(p=>p.on,true):'<p class="mt">Пока никого. Ждём гостей…</p>'}<p class="mt" style="margin-top:1.4cqi">В игре: ${n}</p></div></div>`}
+    h=`<div class="scene lobby"><div class="qr"><img src="${esc(s.qr)}" alt="QR-код для входа"></div><div><p class="url">Сканируйте QR-код камерой телефона</p><h2>${esc(s.title)}</h2>${n?chips(p=>p.on,true):'<p class="mt">Пока никого. Ждём гостей…</p>'}<p class="mt" style="margin-top:1.4cqi">В игре: ${n}</p></div></div>`}
   else if(s.phase==='write'){const on=s.players.filter(p=>p.on),n=on.filter(p=>p.answered).length;
     h=`<div class="scene">${bar(qn,1)}${prompt(s.q)}<p class="mt">Напишите на телефоне правдоподобную ложь. Ответили: ${n} из ${on.length}</p><div style="margin-top:auto">${chips(p=>p.answered)}</div></div>`}
   else if(s.phase==='vote'){const on=s.players.filter(p=>p.on),n=on.filter(p=>p.voted).length;
@@ -136,7 +136,7 @@ function render(){
 function ctrl(){
   if(!S)return;const ph=S.phase,lobby=ph==='lobby';
   const lab={lobby:'Начать игру',write:'Закрыть приём ответов',vote:'Показать результаты',reveal:'Дальше',round:'Следующий вопрос',final:'Сыграть ещё'};
-  const hint={lobby:`Нужно минимум 2 игрока. Вопросов в наборе: ${S.total}. Пробел или → — следующий шаг.`,write:'Гости пишут ложь. Приём закроется сам по таймеру или когда ответят все.',vote:'Гости ищут правду.',reveal:'Карточки открываются сами. «Дальше» — пропустить.',round:'Промежуточный счёт.',final:'Финал! Счёт обнулится, гости останутся в комнате.'};
+  const hint={lobby:`Нужно минимум 2 игрока. Вопросов в наборе: ${S.total}. Пробел или → — следующий шаг.`,write:'Гости пишут ложь. Приём закроется сам по таймеру или когда ответят все.',vote:'Гости ищут правду.',reveal:'Пробел или «Дальше» — открыть следующий ответ. Не торопитесь: есть время обшутить.',round:'Промежуточный счёт.',final:'Финал! Счёт обнулится, гости останутся в комнате.'};
   $('next').textContent=lab[ph];$('next').disabled=lobby&&S.players.length<2;$('hint').textContent=hint[ph];
   for(const id of['seg','botsL','cust'])$(id).style.display=lobby?'':'none';
   $('seg').innerHTML=packs.map(p=>`<button data-p="${esc(p.id)}" aria-pressed="${S.packId===p.id}">${esc(p.label)}</button>`).join('')+(S.packId==='custom'?'<button aria-pressed="true">Свои вопросы</button>':'');
