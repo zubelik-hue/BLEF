@@ -1,3 +1,3 @@
-// Точка входа для Netlify Server: запускаем тот же сервер игры на порту, который выдаёт Netlify.
-import game from '../../server.js';
-game.server.listen(process.env.PORT || 3000);
+// Точка входа для Netlify Server: запускаем сервер игры на порту, который выдаёт Netlify.
+import { server } from '../../server.mjs';
+server.listen(process.env.PORT || 3000);

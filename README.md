@@ -77,8 +77,8 @@ npm start
 
 ## Устройство
 
-- `netlify.toml`, `netlify/server/index.mjs` — запуск на Netlify.
-- `server.js` — комнаты, фазы игры, таймеры, очки, боты (Express + Socket.IO).
+- `netlify.toml`, `netlify/server/index.mjs` — запуск на Netlify; `start.mjs` — локальный запуск.
+- `server.mjs` — комнаты, фазы игры, таймеры, очки, боты (Express + Socket.IO).
 - `public/host.html` — большой экран и пульт ведущего.
 - `public/play.html` — телефон гостя.
 - `packs.json` — наборы вопросов.

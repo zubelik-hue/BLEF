@@ -2,10 +2,10 @@
   "name": "blef",
   "version": "0.1.0",
   "description": "Блеф — игра для свадеб и корпоративов",
-  "main": "server.js",
+  "main": "server.mjs",
   "scripts": {
-    "start": "node server.js",
-    "test": "node test/e2e.js"
+    "start": "node start.mjs",
+    "test": "node test/e2e.mjs"
   },
   "license": "UNLICENSED",
   "dependencies": {
@@ -19,5 +19,6 @@
   "engines": {
     "node": ">=24"
   },
-  "private": true
+  "private": true,
+  "type": "module"
 }
