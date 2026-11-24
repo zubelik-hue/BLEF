@@ -17,6 +17,7 @@ const PTS_TRUTH = 1000, PTS_FOOL = 500;
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (_, res) => res.redirect('/host.html'));
+app.get('/health', (_, res) => res.send('ok'));
 app.get('/packs', (_, res) => res.json(Object.entries(PACKS).map(([id, p]) => ({ id, label: p.label, title: p.title, n: p.qs.length }))));
 const server = http.createServer(app);
 const io = new Server(server);
@@ -39,7 +40,8 @@ function lanIP() {
   return 'localhost';
 }
 function baseUrl(origin) {
-  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, '');
+  const pub = process.env.PUBLIC_URL;
+  if (pub) return pub.replace(/\/$/, '');
   try { const u = new URL(origin); if (['localhost', '127.0.0.1', '::1'].includes(u.hostname)) u.hostname = lanIP(); return u.origin; }
   catch { return `http://${lanIP()}:${PORT}`; }
 }
@@ -261,8 +263,12 @@ io.on('connection', s => {
 
   s.on('disconnect', () => {
     const m = me(); if (!m?.p || m.p.sock !== s.id) return;
-    m.p.sock = null; broadcast(m.r);
-    if (m.r.phase === 'write') checkAnswers(m.r); else if (m.r.phase === 'vote') checkVotes(m.r);
+    const { r, p } = m; p.sock = null; broadcast(r);
+    // Соединения иногда рвутся у всех сразу (перезапуск, лимит хостинга) — ждём переподключения, прежде чем двигать игру.
+    setTimeout(() => {
+      if (p.sock || !r.players.has(p.id)) return;
+      if (r.phase === 'write') checkAnswers(r); else if (r.phase === 'vote') checkVotes(r);
+    }, 8000);
   });
 });
 

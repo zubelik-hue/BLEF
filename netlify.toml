@@ -1,0 +1,7 @@
+# Статические страницы (host.html, play.html) раздаёт CDN Netlify,
+# а всё остальное (/socket.io, /packs, /) обрабатывает сервер из netlify/server/index.mjs.
+[build]
+  publish = "public"
+
+[build.environment]
+  NODE_VERSION = "24"
