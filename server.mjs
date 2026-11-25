@@ -7,12 +7,14 @@ import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
 import { Server } from 'socket.io';
 import PACKS from './packs.json' with { type: 'json' };
+import WHO from './who.json' with { type: 'json' };
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)); // не __dirname: Netlify объявляет его сам
 const PORT = +process.env.PORT || 3000;
 const T_WRITE = +process.env.T_WRITE || 45;   // секунд на ложь
 const T_VOTE = +process.env.T_VOTE || 30;     // секунд на голосование
-const T_REVEAL = +process.env.T_REVEAL || 4;  // секунд на одну карточку раскрытия
+const T_WHO = +process.env.T_WHO || 25;       // секунд на голос в «Кто из нас?»
+const WHO_ROUNDS = 8;                          // вопросов за игру «Кто из нас?»
 const MAX_PLAYERS = 20;
 const PTS_TRUTH = 1000, PTS_FOOL = 500;
 
@@ -20,7 +22,7 @@ const app = express();
 app.use(express.static(path.join(HERE, 'public')));
 app.get('/', (_, res) => res.redirect('/host.html'));
 app.get('/health', (_, res) => res.send('ok'));
-app.get('/packs', (_, res) => res.json(Object.entries(PACKS).map(([id, p]) => ({ id, label: p.label, title: p.title, n: p.qs.length }))));
+app.get('/packs', (_, res) => res.json(Object.entries(PACKS).map(([id, p]) => ({ id, label: p.label, title: p.title, n: p.qs.length, whoN: WHO[id]?.qs.length || 0 }))));
 const server = http.createServer(app);
 const io = new Server(server, { serveClient: false }); // клиент Socket.IO лежит в public/
 
@@ -55,7 +57,7 @@ function newCode() { let c; do c = Array.from({ length: 4 }, () => ALPHA[Math.fl
 async function makeRoom(origin) {
   const code = newCode();
   const url = `${baseUrl(origin)}/play.html?r=${code}`;
-  const r = { code, url, qr: await QRCode.toDataURL(url, { margin: 1, width: 480 }), packId: 'wedding', pack: PACKS.wedding,
+  const r = { code, url, qr: await QRCode.toDataURL(url, { margin: 1, width: 480 }), packId: 'wedding', pack: PACKS.wedding, mode: 'blef', who: WHO.wedding, game: [],
     players: new Map(), nextId: 1, phase: 'lobby', qi: 0, t: 0, ans: {}, votes: {}, opts: [], rev: [], ri: 0, delta: {}, fool: {},
     timers: [], iv: null, revT: null, touched: Date.now() };
   rooms.set(code, r);
@@ -65,7 +67,10 @@ const later = (r, fn, ms) => r.timers.push(setTimeout(fn, ms));
 function clearTimers(r) { r.timers.forEach(clearTimeout); r.timers = []; clearInterval(r.iv); r.iv = null; clearTimeout(r.revT); }
 const list = r => [...r.players.values()];
 const active = r => list(r).filter(p => p.bot || p.sock);
-const Q = r => r.pack.qs[r.qi];
+const Q = r => r.game[r.qi];
+const modePack = r => r.mode === 'who' ? r.who : r.pack;
+const total = r => r.phase === 'lobby' ? (r.mode === 'who' ? Math.min(WHO_ROUNDS, r.who.qs.length) : r.pack.qs.length) : r.game.length;
+const PTS_WHO = 500;
 
 function addPlayer(r, { name, pid = null, bot = false }) {
   const used = new Set(list(r).map(p => p.name.toLowerCase()));
@@ -141,35 +146,72 @@ function toReveal(r) {
     else o.authors.forEach(a => { r.delta[a] += PTS_FOOL * o.voters.length; r.fool[a] = (r.fool[a] || 0) + o.voters.length; });
   }
   r.rev = [...r.opts.filter(o => !o.truth && o.voters.length).sort((a, b) => a.voters.length - b.voters.length), r.opts.find(o => o.truth)];
-  r.ri = 0; r.phase = 'reveal';
-  r.revT = setTimeout(() => stepReveal(r), T_REVEAL * 1000);
+  r.ri = 0; r.phase = 'reveal'; // карточки листает ведущий — пробелом или кнопкой «Дальше»
   broadcast(r);
 }
 function stepReveal(r) {
   if (r.phase !== 'reveal') return;
   clearTimeout(r.revT);
-  if (r.ri < r.rev.length - 1) { r.ri++; r.revT = setTimeout(() => stepReveal(r), T_REVEAL * 1000); broadcast(r); }
+  if (r.ri < r.rev.length - 1) { r.ri++; broadcast(r); }
   else toRound(r);
 }
 function toRound(r) {
   clearTimers(r);
   for (const p of list(r)) { p.score += r.delta[p.id] || 0; p.fooled += r.fool[p.id] || 0; }
-  r.phase = r.qi < r.pack.qs.length - 1 ? 'round' : 'final';
+  r.phase = r.qi < r.game.length - 1 ? 'round' : 'final';
   broadcast(r);
 }
+// ---------- режим «Кто из нас?» ----------
+function startWho(r) {
+  clearTimers(r);
+  Object.assign(r, { phase: 'whovote', ans: {}, votes: {}, opts: [], rev: [], ri: 0, delta: {}, fool: {}, tally: [] });
+  for (const p of list(r)) if (p.bot) later(r, () => { if (r.phase !== 'whovote') return; botWho(r, p); broadcast(r); checkWho(r); }, rnd(2000, 9000));
+  startTimer(r, T_WHO, () => toWhoReveal(r));
+  broadcast(r);
+}
+function botWho(r, p) {
+  if (p.id in r.votes) return;
+  const c = list(r); if (!c.length) return;
+  // боты чаще голосуют за того, за кого уже голосуют — так получается «большинство»
+  const pool = c.flatMap(x => Array(1 + Object.values(r.votes).filter(v => v === x.id).length * 2).fill(x.id));
+  r.votes[p.id] = pool[Math.floor(Math.random() * pool.length)];
+}
+function checkWho(r) { if (active(r).every(p => p.id in r.votes)) later(r, () => toWhoReveal(r), 900); }
+function toWhoReveal(r) {
+  if (r.phase !== 'whovote') return;
+  clearTimers(r);
+  for (const p of list(r)) if (p.bot) botWho(r, p);
+  const t = new Map();
+  for (const [voter, cand] of Object.entries(r.votes)) { if (!r.players.has(cand)) continue; if (!t.has(cand)) t.set(cand, []); t.get(cand).push(+voter); }
+  r.tally = [...t.entries()].map(([id, voters]) => ({ id, voters })).sort((a, b) => b.voters.length - a.voters.length);
+  const top = r.tally[0]?.voters.length || 0;
+  r.leaders = r.tally.filter(x => x.voters.length === top && top > 0).map(x => x.id);
+  r.delta = {}; for (const p of list(r)) r.delta[p.id] = 0;
+  for (const x of r.tally) if (r.leaders.includes(x.id)) x.voters.forEach(v => r.delta[v] += PTS_WHO);
+  for (const x of r.tally) { const p = r.players.get(x.id); if (p) p.picked = (p.picked || 0) + x.voters.length; }
+  r.phase = 'whoreveal';
+  broadcast(r);
+}
+
 function next(r) {
   switch (r.phase) {
-    case 'lobby': if (list(r).length >= 2) { r.qi = 0; startQuestion(r); } break;
+    case 'lobby': if (list(r).length >= 2) {
+      r.qi = 0;
+      if (r.mode === 'who') { r.game = shuffle(r.who.qs.map(q => ({ q }))).slice(0, WHO_ROUNDS); startWho(r); }
+      else { r.game = r.pack.qs; startQuestion(r); }
+    } break;
+    case 'whovote': toWhoReveal(r); break;
+    case 'whoreveal': toRound(r); break;
     case 'write': toVote(r); break;
     case 'vote': toReveal(r); break;
     case 'reveal': stepReveal(r); break;
-    case 'round': r.qi++; startQuestion(r); break;
+    case 'round': r.qi++; r.mode === 'who' ? startWho(r) : startQuestion(r); break;
     case 'final': reset(r); break;
   }
 }
 function reset(r) {
   clearTimers(r);
-  for (const p of list(r)) { p.score = 0; p.fooled = 0; }
+  for (const p of list(r)) { p.score = 0; p.fooled = 0; p.picked = 0; }
   Object.assign(r, { phase: 'lobby', qi: 0, ans: {}, votes: {}, opts: [], rev: [], ri: 0, delta: {}, fool: {} });
   broadcast(r);
 }
@@ -177,7 +219,7 @@ function reset(r) {
 // ---------- что видит каждый ----------
 const ranking = r => list(r).sort((a, b) => b.score - a.score).map(p => ({ id: p.id, name: p.name, col: p.col, score: p.score, delta: r.delta[p.id] || 0, bot: p.bot }));
 function hostView(r) {
-  const v = { code: r.code, url: r.url, qr: r.qr, phase: r.phase, qi: r.qi, total: r.pack.qs.length, title: r.pack.title, packId: r.packId, t: r.t,
+  const v = { code: r.code, url: r.url, qr: r.qr, phase: r.phase, mode: r.mode, qi: r.qi, total: total(r), title: modePack(r).title, packId: r.packId, t: r.t,
     q: r.phase === 'lobby' ? null : Q(r)?.q,
     players: list(r).map(p => ({ id: p.id, name: p.name, col: p.col, bot: p.bot, on: p.bot || !!p.sock, answered: p.id in r.ans, voted: p.id in r.votes })) };
   if (r.phase === 'vote') v.opts = r.opts.map(o => o.text);
@@ -186,12 +228,24 @@ function hostView(r) {
     v.card = { text: o.text, truth: o.truth, voters: o.voters.map(nm), authors: o.authors.map(nm), pts: o.truth ? PTS_TRUTH : PTS_FOOL * o.voters.length };
     v.ri = r.ri; v.revLen = r.rev.length;
   }
+  if (r.phase === 'whoreveal') {
+    const nm = id => r.players.get(id)?.name || '?';
+    v.tally = r.tally.map(x => ({ name: nm(x.id), col: r.players.get(x.id)?.col, n: x.voters.length, voters: x.voters.map(nm), lead: r.leaders.includes(x.id) }));
+    v.leaders = r.leaders.map(nm); v.guessed = Object.values(r.delta).filter(d => d > 0).length;
+  }
   if (r.phase === 'round' || r.phase === 'final') v.ranking = ranking(r);
-  if (r.phase === 'final') { const l = list(r).sort((a, b) => b.fooled - a.fooled)[0]; if (l && l.fooled) v.liar = { name: l.name, fooled: l.fooled }; }
+  if (r.phase === 'final' && r.mode === 'who') { const st = list(r).sort((a, b) => (b.picked || 0) - (a.picked || 0))[0]; if (st && st.picked) v.star = { name: st.name, n: st.picked }; }
+  if (r.phase === 'final' && r.mode !== 'who') { const l = list(r).sort((a, b) => b.fooled - a.fooled)[0]; if (l && l.fooled) v.liar = { name: l.name, fooled: l.fooled }; }
   return v;
 }
 function playerView(r, p) {
-  const v = { phase: r.phase, code: r.code, title: r.pack.title, name: p.name, col: p.col, score: p.score, qi: r.qi, total: r.pack.qs.length };
+  const v = { phase: r.phase, mode: r.mode, code: r.code, title: modePack(r).title, name: p.name, col: p.col, score: p.score, qi: r.qi, total: total(r) };
+  if (r.phase === 'whovote') {
+    v.q = Q(r).q; v.t = r.t;
+    v.voted = p.id in r.votes ? (r.players.get(r.votes[p.id])?.name ?? '?') : null;
+    v.cands = list(r).map(x => ({ id: x.id, name: x.name, col: x.col, me: x.id === p.id }));
+  }
+  if (r.phase === 'whoreveal') { v.leaders = r.leaders.map(id => r.players.get(id)?.name || '?'); v.delta = r.delta[p.id] || 0; }
   if (r.phase === 'write' || r.phase === 'vote') { v.q = Q(r).q; v.t = r.t; }
   if (r.phase === 'write') v.lie = r.ans[p.id] ?? null;
   if (r.phase === 'vote') {
@@ -220,6 +274,12 @@ io.on('connection', s => {
   s.on('host:resume', ({ code } = {}, ack) => { const r = rooms.get(String(code).toUpperCase()); if (!r) return ack?.({ ok: false }); attachHost(r); ack?.({ ok: true }); });
   s.on('host:pack', ({ id, custom } = {}, ack) => {
     const r = hostRoom(); if (!r || r.phase !== 'lobby') return ack?.({ ok: false });
+    if (custom && r.mode === 'who') {
+      const qs = (custom.qs || []).slice(0, 40).map(q => ({ q: clean(typeof q === 'string' ? q : q.q, 140) })).filter(q => q.q.length > 4).map(q => q.q);
+      if (!qs.length) return ack?.({ ok: false, err: 'Не нашёл ни одного вопроса' });
+      r.who = { title: clean(custom.title, 60) || 'Наш праздник', qs }; r.packId = 'custom';
+      broadcast(r); return ack?.({ ok: true, n: qs.length });
+    }
     if (custom) {
       const qs = (custom.qs || []).slice(0, 30).map(q => {
         let text = clean(q.q, 140); if (!text.includes('___')) text += ' ___';
@@ -227,9 +287,10 @@ io.on('connection', s => {
       }).filter(q => q.q.length > 4 && q.truth);
       if (!qs.length) return ack?.({ ok: false, err: 'Не нашёл ни одного вопроса' });
       r.pack = { title: clean(custom.title, 60) || 'Наш праздник', qs }; r.packId = 'custom';
-    } else if (PACKS[id]) { r.pack = PACKS[id]; r.packId = id; }
+    } else if (PACKS[id]) { r.pack = PACKS[id]; r.who = WHO[id] || r.who; r.packId = id; }
     broadcast(r); ack?.({ ok: true, n: r.pack.qs.length });
   });
+  s.on('host:mode', m => { const r = hostRoom(); if (r && r.phase === 'lobby' && (m === 'blef' || m === 'who')) { r.mode = m; broadcast(r); } });
   s.on('host:bots', n => { const r = hostRoom(); if (r && r.phase === 'lobby') { setBots(r, +n || 0); broadcast(r); } });
   s.on('host:next', () => { const r = hostRoom(); if (r) next(r); });
   s.on('host:reset', () => { const r = hostRoom(); if (r) reset(r); });
@@ -263,13 +324,18 @@ io.on('connection', s => {
     m.r.votes[m.p.id] = +i; ack?.({ ok: true }); broadcast(m.r); checkVotes(m.r);
   });
 
+  s.on('p:who', (id, ack) => {
+    const m = me(); if (!m?.p || m.r.phase !== 'whovote' || m.p.id in m.r.votes || !m.r.players.has(+id)) return ack?.({ ok: false });
+    m.r.votes[m.p.id] = +id; ack?.({ ok: true }); broadcast(m.r); checkWho(m.r);
+  });
+
   s.on('disconnect', () => {
     const m = me(); if (!m?.p || m.p.sock !== s.id) return;
     const { r, p } = m; p.sock = null; broadcast(r);
     // Соединения иногда рвутся у всех сразу (перезапуск, лимит хостинга) — ждём переподключения, прежде чем двигать игру.
     setTimeout(() => {
       if (p.sock || !r.players.has(p.id)) return;
-      if (r.phase === 'write') checkAnswers(r); else if (r.phase === 'vote') checkVotes(r);
+      if (r.phase === 'write') checkAnswers(r); else if (r.phase === 'vote') checkVotes(r); else if (r.phase === 'whovote') checkWho(r);
     }, 8000);
   });
 });

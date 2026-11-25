@@ -21,7 +21,7 @@ server.listen(3999,async()=>{
   const own=A.v.opts.some(o=>o.text.startsWith('с тремя'));console.log(' opts',hs.opts.length,'own hidden for A:',!own);
   A.emit('p:vote',A.v.opts[0].i);B.emit('p:vote',B.v.opts[1].i);
   await wait(4600);
-  let guard=0;while(hs.phase==='reveal'&&guard++<40){await wait(200)}
+  let guard=0;while(hs.phase==='reveal'&&guard++<40){h.emit('host:next');await wait(150)}
   console.log(' after reveal ->',hs.phase,'A delta',A.v.delta,'place',A.v.place,'/',A.v.n);
   if(hs.phase==='final')break;
  }

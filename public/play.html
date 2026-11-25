@@ -69,7 +69,7 @@ function draw(force){
     <form id="jf"><label>Код комнаты<input class="code" id="code" maxlength="4" autocomplete="off" value="${esc(urlCode||store.get('blef-me')?.code||'')}" required></label>
     <label>Ваше имя<input id="nm" maxlength="18" autocomplete="name" value="${esc(store.get('blef-me')?.name||'')}" placeholder="Например, тётя Света" required></label>
     ${err?`<p class="warn">${esc(err)}</p>`:''}<button class="btn">Войти</button></form>`;
-  }else if(V.phase==='lobby')h+=`<div class="center"><h1>Вы в игре!</h1><p class="mut">${esc(V.title)}</p><p class="mut">Смотрите на большой экран — ведущий скоро начнёт.</p></div>`;
+  }else if(V.phase==='lobby')h+=`<div class="center"><h1>Вы в игре!</h1><p class="mut">${V.mode==='who'?'Режим «Кто из нас?»':'Режим «Блеф»'} · ${esc(V.title)}</p><p class="mut">Смотрите на большой экран — ведущий скоро начнёт.</p></div>`;
   else if(V.phase==='write'){
     if(V.lie==null)h+=`<p class="mut">Вопрос ${V.qi+1} из ${V.total} · <span class="tm" id="tm">${t??''}</span></p><h2>${esc(V.q)}</h2>
       <form id="lf"><textarea id="lie" rows="3" maxlength="60" placeholder="Придумайте правдоподобную ложь" aria-label="Ваша ложь"></textarea><p class="cnt" id="cnt">0 / 60</p>${warn?`<p class="warn">${esc(warn)}</p>`:''}<button class="btn">Отправить</button></form>`;
@@ -77,13 +77,18 @@ function draw(force){
   }else if(V.phase==='vote'){
     if(V.voted==null)h+=`<p class="mut">Где правда? · <span class="tm" id="tm">${t??''}</span></p><h2>${esc(V.q)}</h2><div class="list">${V.opts.map(o=>`<button class="vb" data-v="${o.i}"><i>${L[o.i]}</i><span>${esc(o.text)}</span></button>`).join('')}</div><p class="mut" style="font-size:14px">Свой вариант не показываем.</p>`;
     else h+=`<div class="center"><h2>Голос принят</h2><p class="mut">Вы выбрали «${esc(V.voted)}»</p></div>`;
-  }else if(V.phase==='reveal')h+=`<div class="center"><h2>Смотрите на экран</h2><p class="mut">Сейчас станет ясно, кто кого обманул.</p></div>`;
+  }else if(V.phase==='whovote'){
+    if(V.voted==null)h+=`<p class="mut">Вопрос ${V.qi+1} из ${V.total} · <span class="tm" id="tm">${t??''}</span></p><h2>${esc(V.q)}</h2><div class="list">${V.cands.map(c=>`<button class="vb" data-w="${c.id}"><span class="dot" style="--c:${esc(c.col)}"></span><span>${esc(c.name)}${c.me?' (вы)':''}</span></button>`).join('')}</div>`;
+    else h+=`<div class="center"><h2>Голос принят</h2><p class="mut">Вы выбрали: ${esc(V.voted)}</p><p class="mut">Ждём остальных…</p></div>`;
+  }else if(V.phase==='whoreveal')h+=`<div class="center"><h2>Смотрите на экран</h2>${V.delta?`<p class="big">+${V.delta}</p><p>Вы совпали с большинством!</p>`:`<p class="mut">В этот раз вы не совпали с большинством.</p>`}</div>`;
+  else if(V.phase==='reveal')h+=`<div class="center"><h2>Смотрите на экран</h2><p class="mut">Сейчас станет ясно, кто кого обманул.</p></div>`;
   else h+=`<div class="center">${V.phase==='round'?`<p class="mut">За этот вопрос</p><p class="big">+${V.delta}</p>`:`<h1>Игра окончена</h1><p class="big">${V.score}</p>`}<p>Вы на ${V.place}-м месте из ${V.n}</p></div>`;
   a.innerHTML=h;
   const jf=$('jf');if(jf)jf.onsubmit=e=>{e.preventDefault();join($('code').value.trim().toUpperCase(),$('nm').value.trim())};
   const lf=$('lf');if(lf){const ta=$('lie');ta.oninput=()=>$('cnt').textContent=ta.value.length+' / 60';
     lf.onsubmit=e=>{e.preventDefault();const v=ta.value.trim();if(!v)return;const b=lf.querySelector('button');b.disabled=true;
       sock.emit('p:lie',v,r=>{b.disabled=false;if(r.ok)warn='';else{warn=r.warn||'';const keep=ta.value;draw(true);if($('lie')){$('lie').value=keep}}})}}
+  a.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{a.querySelectorAll('[data-w]').forEach(x=>x.disabled=true);sock.emit('p:who',+b.dataset.w)});
   a.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{a.querySelectorAll('[data-v]').forEach(x=>x.disabled=true);sock.emit('p:vote',+b.dataset.v)});
   if(V&&V.phase!=='write')warn='';
 }
