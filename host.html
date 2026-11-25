@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Блеф — экран ведущего</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3eee8;--ink:#1d1416;--mut:#6d5d60;--card:#fff;--line:#e2d8d0;--coral:#ff5a4e;--gold:#f6c344}
+@media(prefers-color-scheme:dark){:root{--bg:#141012;--ink:#f3ebe6;--mut:#a8999b;--card:#211a1c;--line:#382d30}}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Rubik,system-ui,sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:20px max(3vw,16px) 40px}
+.tv{container-type:inline-size;aspect-ratio:16/9;border-radius:18px;background:radial-gradient(110% 85% at 50% -5%,#7a1f35 0%,#3a1020 52%,#1f0810 100%);color:#fbefe9;overflow:hidden;position:relative;font-size:max(13px,1.7cqi)}
+.tv:fullscreen{border-radius:0;aspect-ratio:auto;width:100vw;height:100vh}
+.scene{position:absolute;inset:0;padding:4cqi 4.5cqi;display:flex;flex-direction:column;gap:1.8cqi;overflow:auto}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#e8c9c4}
+.bar b{font:600 max(13px,1.5cqi)/1 Unbounded,sans-serif}
+.tm{font:800 max(18px,2.8cqi)/1 Unbounded,sans-serif;color:var(--gold);font-variant-numeric:tabular-nums}
+.prompt{font:700 max(20px,4cqi)/1.15 Unbounded,sans-serif;margin:0;text-wrap:balance}
+.prompt.sm{font-size:max(15px,2.3cqi)}
+.blank{display:inline-block;min-width:6em;border-bottom:.12em solid var(--gold);color:var(--gold)}
+.mt{color:#d9b9b4;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:.7cqi}
+.chip{display:inline-flex;align-items:center;gap:.5em;padding:.35em .8em;border-radius:99px;background:rgb(255 255 255/.1);font-weight:500;border:0;color:inherit;font:inherit}
+.chip::before{content:"";width:.7em;height:.7em;border-radius:50%;background:var(--c)}
+.chip.off{opacity:.3}
+button.chip{cursor:pointer}button.chip:hover{background:rgb(255 90 78/.35)}
+.lobby{flex-direction:row;align-items:center;gap:5cqi}
+.qr{flex:none;width:30cqi;background:#fff;border-radius:14px;padding:1cqi}.qr img{display:block;width:100%}
+.url{font-size:max(14px,1.8cqi);margin:0;word-break:break-all}.url b{color:var(--gold);font:800 1.6em Unbounded,sans-serif;letter-spacing:.08em}
+.lobby h2{font:800 max(20px,3.4cqi)/1.1 Unbounded,sans-serif;margin:1cqi 0 1.6cqi}
+.opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.2cqi;margin-top:auto}
+.opt{background:rgb(255 255 255/.08);border:1px solid rgb(255 255 255/.12);border-radius:12px;padding:1.2cqi 1.4cqi;display:flex;gap:.8em;align-items:baseline;font-size:max(13px,1.7cqi);line-height:1.3}
+.opt i{font:800 normal .9em/1 Unbounded,sans-serif;color:var(--gold)}
+.card{margin:auto 0;background:#fbefe9;color:#2a0d16;border-radius:16px;padding:3cqi 3.4cqi;position:relative;animation:pop .45s cubic-bezier(.2,1.4,.5,1)}
+.card .ans{font:800 max(20px,3.8cqi)/1.1 Unbounded,sans-serif;margin:0 0 1.4cqi;text-wrap:balance}
+.card p{margin:.4cqi 0;font-size:max(14px,1.9cqi)}
+.card .pts{color:#c2321f;font-weight:700}
+.card.truth{background:var(--gold)}
+.stamp{position:absolute;top:-1.4cqi;right:2.4cqi;background:#2a0d16;color:var(--gold);font:800 max(12px,1.5cqi)/1 Unbounded,sans-serif;padding:.8cqi 1.4cqi;border-radius:8px;transform:rotate(4deg)}
+.stamp.lie{color:#ff8a80}
+.dots{display:flex;gap:.6cqi;justify-content:center}.dots span{width:.8cqi;height:.8cqi;min-width:6px;min-height:6px;border-radius:50%;background:rgb(255 255 255/.25)}.dots .on{background:var(--gold)}
+.rows{display:grid;gap:.9cqi;margin-top:auto}
+.row{display:grid;grid-template-columns:minmax(0,11em) minmax(0,1fr) 6em;gap:1.4cqi;align-items:center}
+.tr{height:2cqi;min-height:12px;border-radius:99px;background:rgb(255 255 255/.08);overflow:hidden}
+.fl{height:100%;border-radius:99px;background:var(--c);transition:width .8s}
+.sc{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.sc small{color:var(--gold)}
+.win{margin:auto 0;text-align:center}.win h2{font:800 max(26px,6cqi)/1.05 Unbounded,sans-serif;margin:.6cqi 0;color:var(--gold)}
+.ctrl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+.seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px;flex-wrap:wrap}
+.seg button{border:0;background:none;color:var(--ink);font:500 15px Rubik,sans-serif;padding:0 14px;min-height:40px;border-radius:9px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.btn{font:600 15px Unbounded,sans-serif;min-height:46px;padding:0 20px;border-radius:12px;border:0;background:var(--coral);color:#fff;cursor:pointer}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.ghost{font:500 15px Rubik,sans-serif;min-height:46px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+label.bots{display:flex;align-items:center;gap:8px;color:var(--mut)}
+label.bots select{font:16px Rubik;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 8px}
+.hint{color:var(--mut);font-size:14px;flex-basis:100%;margin:0}
+details{margin-top:18px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 18px}
+summary{cursor:pointer;font-weight:500;min-height:44px;display:flex;align-items:center}
+details textarea{width:100%;min-height:180px;font:15px/1.5 ui-monospace,Menlo,monospace;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+details p{color:var(--mut);font-size:14px;margin:6px 0 10px}
+.msg{font-size:14px;margin-left:10px}
+.credit{display:flex;align-items:center;gap:10px;margin:18px 0 0;color:var(--mut);font-size:15px}.credit a{color:var(--ink);display:inline-flex;align-items:center;min-height:44px;min-width:24px}.credit a:hover{color:var(--coral)}
+.lead{color:var(--gold)}.lead .fl{box-shadow:0 0 0 2px var(--gold)}
+.big-name{color:var(--gold)}
+button:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.off-line{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#000a;color:#fff;padding:6px 14px;border-radius:99px;font-size:14px}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){.card{animation:none}.fl{transition:none}}
+@media(max-width:700px){.tv{aspect-ratio:auto;min-height:460px}.scene{position:relative;min-height:460px;padding:20px}.lobby{flex-direction:column;align-items:flex-start}.qr{width:160px}.opts{grid-template-columns:minmax(0,1fr)}.row{grid-template-columns:minmax(0,7em) minmax(0,1fr) 5.5em}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tv" id="tv"><div class="scene"><p class="mt">Подключаюсь к серверу…</p></div></div>
+  <div class="ctrl">
+    <div class="seg" id="mode" role="group" aria-label="Режим игры"><button data-m="blef">Блеф</button><button data-m="who">Кто из нас?</button></div>
+    <div class="seg" id="seg" role="group" aria-label="Набор вопросов"></div>
+    <label class="bots" id="botsL">Боты для теста
+      <select id="bots"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+    <button class="btn" id="next">Начать игру</button>
+    <button class="ghost" id="fs">На весь экран</button>
+    <button class="ghost" id="reset">Сбросить счёт</button>
+    <button class="ghost" id="new">Новая комната</button>
+    <p class="hint" id="hint"></p>
+  </div>
+  <details id="cust">
+    <summary>Свои вопросы про героев вечера</summary>
+    <p id="chelp"></p>
+    <textarea id="ctext" spellcheck="false">Юбилей Ольги Сергеевны
+Ольга Сергеевна однажды выиграла в лотерею ___ | живого гуся | путёвку в Сочи; холодильник
+На первой работе Ольга Сергеевна была ___ | вожатой в лагере</textarea>
+    <p><button class="btn" id="capply">Использовать эти вопросы</button><span class="msg" id="cmsg" role="status"></span></p>
+  </details>
+  <p class="credit"><a href="https://www.instagram.com/vladimir_zubelik?hvrq=MW9uY3Q1MTZvMG81bA%3D%3D&amp;utm_source=qr" target="_blank" rel="noopener" aria-label="Instagram @vladimir_zubelik"><img src="/instagram.png" width="28" height="28" alt=""></a><span>Made by <a href="https://www.instagram.com/vladimir_zubelik?hvrq=MW9uY3Q1MTZvMG81bA%3D%3D&amp;utm_source=qr" target="_blank" rel="noopener">@vladimir_zubelik</a> for @nikonkursy</span></p>
+</div>
+<script src="/socket.io.min.js"></script>
+<script>
+{
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const L='ABCDEFGHIJKLMNOPQRSTU';
+const sock=io();let S=null,packs=[];
+const store={get(k){try{return localStorage.getItem(k)}catch{return null}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
+
+function create(){sock.emit('host:create',{origin:location.origin},a=>store.set('blef-host',a.code))}
+sock.on('connect',()=>{const c=store.get('blef-host');if(c)sock.emit('host:resume',{code:c},a=>{if(!a.ok)create()});else create()});
+sock.on('disconnect',()=>{$('tv').insertAdjacentHTML('beforeend','<div class="off-line">Нет связи с сервером…</div>')});
+sock.on('state',s=>{S=s;render()});
+sock.on('tick',t=>{if(S)S.t=t;const e=$('tm');if(e)e.textContent=t});
+fetch('/packs').then(r=>r.json()).then(p=>{packs=p;ctrl()});
+
+const prompt=(q,cls='')=>`<h2 class="prompt ${cls}">${esc(q).replace('___','<span class="blank">______</span>')}</h2>`;
+const bar=(r,t)=>`<div class="bar"><b>${r}</b>${t?`<span class="tm" id="tm">${S.t}</span>`:''}</div>`;
+const chips=(f,kick)=>`<div class="chips">${S.players.map(p=>kick&&!p.bot?`<button class="chip${f(p)?'':' off'}" style="--c:${esc(p.col)}" data-kick="${p.id}" title="Убрать из комнаты">${esc(p.name)}</button>`:`<span class="chip${f(p)?'':' off'}" style="--c:${esc(p.col)}">${esc(p.name)}</span>`).join('')}</div>`;
+
+function render(){
+  const s=S,qn=`Вопрос ${s.qi+1} из ${s.total}`;let h='';
+  if(s.phase==='lobby'){const n=s.players.length;
+    h=`<div class="scene lobby"><div class="qr"><img src="${esc(s.qr)}" alt="QR-код для входа"></div><div><p class="url">Сканируйте QR-код камерой телефона</p><h2>${s.mode==='who'?'Кто из нас?':'Блеф'} · ${esc(s.title)}</h2>${n?chips(p=>p.on,true):'<p class="mt">Пока никого. Ждём гостей…</p>'}<p class="mt" style="margin-top:1.4cqi">В игре: ${n}</p></div></div>`}
+  else if(s.phase==='write'){const on=s.players.filter(p=>p.on),n=on.filter(p=>p.answered).length;
+    h=`<div class="scene">${bar(qn,1)}${prompt(s.q)}<p class="mt">Напишите на телефоне правдоподобную ложь. Ответили: ${n} из ${on.length}</p><div style="margin-top:auto">${chips(p=>p.answered)}</div></div>`}
+  else if(s.phase==='vote'){const on=s.players.filter(p=>p.on),n=on.filter(p=>p.voted).length;
+    h=`<div class="scene">${bar(qn+' · голосование',1)}${prompt(s.q,'sm')}<p class="mt">Один из ответов — правда. Найдите его! Проголосовали: ${n} из ${on.length}</p><div class="opts">${s.opts.map((o,i)=>`<div class="opt"><i>${L[i]}</i><span>${esc(o)}</span></div>`).join('')}</div></div>`}
+  else if(s.phase==='reveal'){const c=s.card,v=c.voters.map(esc).join(', ');
+    const body=c.truth
+      ?`<span class="stamp">Правда</span><p class="ans">${esc(c.text)}</p><p>${v?`Угадали: ${v}`:'Никто не угадал — все купились на ложь!'}</p>${v?`<p class="pts">+${c.pts} каждому</p>`:''}`
+      :`<span class="stamp lie">Ложь</span><p class="ans">${esc(c.text)}</p><p>Купились: ${v}</p><p>Это выдумал${c.authors.length>1?'и':'(а)'}: <b>${c.authors.map(esc).join(', ')}</b> <span class="pts">+${c.pts}</span></p>`;
+    h=`<div class="scene">${bar(qn+' · раскрытие')}${prompt(s.q,'sm')}<div class="card${c.truth?' truth':''}">${body}</div><div class="dots">${Array.from({length:s.revLen},(_,i)=>`<span class="${i===s.ri?'on':''}"></span>`).join('')}</div></div>`}
+  else if(s.phase==='whovote'){const on=s.players.filter(p=>p.on),n=on.filter(p=>p.voted).length;
+    h=`<div class="scene">${bar(qn,1)}${prompt(s.q)}<p class="mt">Голосуйте на телефоне за одного из игроков. Можно и за себя. Проголосовали: ${n} из ${on.length}</p><div style="margin-top:auto">${chips(p=>p.voted)}</div></div>`}
+  else if(s.phase==='whoreveal'){const t=s.tally,mx=Math.max(1,t[0]?.n||0),L=s.leaders;
+    const head=!L.length?'Никто не проголосовал':L.length===1?`Большинство выбрало: <span class="big-name">${esc(L[0])}</span>`:`Ничья: <span class="big-name">${L.map(esc).join(' и ')}</span>`;
+    h=`<div class="scene">${bar(qn+' · результаты')}${prompt(s.q,'sm')}<h2 class="prompt">${head}</h2><div class="rows">${t.slice(0,7).map(x=>`<div class="row${x.lead?' lead':''}"><span>${esc(x.name)}</span><div class="tr"><div class="fl" style="--c:${esc(x.col)};width:${x.n/mx*100}%"></div></div><span class="sc">${x.n} гол.</span></div>`).join('')}</div><p class="mt">${s.guessed?`+500 тем, кто совпал с большинством: ${s.guessed} чел.`:''}</p></div>`}
+  else if(s.phase==='round'){const r=s.ranking,mx=Math.max(1,r[0]?.score||0);
+    h=`<div class="scene">${bar(`Счёт после вопроса ${s.qi+1}`)}<h2 class="prompt sm">Кто ведёт?</h2><div class="rows">${r.slice(0,10).map(p=>`<div class="row"><span>${esc(p.name)}</span><div class="tr"><div class="fl" style="--c:${esc(p.col)};width:${p.score/mx*100}%"></div></div><span class="sc">${p.score}${p.delta?` <small>+${p.delta}</small>`:''}</span></div>`).join('')}</div></div>`}
+  else{const w=s.ranking[0];
+    h=`<div class="scene"><div class="win"><p class="mt">Победитель вечера</p><h2>${esc(w?.name)}</h2><p>${w?.score||0} очков</p>${s.star?`<p class="mt" style="margin-top:2cqi">Звезда вечера: <b style="color:#fbefe9">${esc(s.star.name)}</b> — ${s.star.n} голос(ов) за вечер</p>`:''}${s.liar?`<p class="mt" style="margin-top:2cqi">Мастер блефа: <b style="color:#fbefe9">${esc(s.liar.name)}</b> — обманул(а) гостей ${s.liar.fooled} раз</p>`:''}</div><div class="rows">${s.ranking.slice(1,6).map((p,i)=>`<div class="row"><span>${i+2}. ${esc(p.name)}</span><span></span><span class="sc">${p.score}</span></div>`).join('')}</div></div>`}
+  $('tv').innerHTML=h;
+  $('tv').querySelectorAll('[data-kick]').forEach(b=>b.onclick=()=>{if(confirm(`Убрать «${b.textContent}» из комнаты?`))sock.emit('host:kick',+b.dataset.kick)});
+  ctrl();
+}
+function ctrl(){
+  if(!S)return;const ph=S.phase,lobby=ph==='lobby';
+  const lab={lobby:'Начать игру',write:'Закрыть приём ответов',vote:'Показать результаты',reveal:'Дальше',whovote:'Показать результаты',whoreveal:'Дальше',round:'Следующий вопрос',final:'Сыграть ещё'};
+  const hint={lobby:`Нужно минимум 2 игрока. Вопросов в игре: ${S.total}. Пробел или → — следующий шаг.`,write:'Гости пишут ложь. Приём закроется сам по таймеру или когда ответят все.',vote:'Гости ищут правду.',reveal:'Пробел или «Дальше» — открыть следующий ответ. Не торопитесь: есть время обшутить.',whovote:'Гости голосуют. Закроется само по таймеру или когда проголосуют все.',whoreveal:'Время обсудить результат. Пробел — дальше.',round:'Промежуточный счёт.',final:'Финал! Счёт обнулится, гости останутся в комнате.'};
+  $('next').textContent=lab[ph];$('next').disabled=lobby&&S.players.length<2;$('hint').textContent=hint[ph];
+  for(const id of['mode','seg','botsL','cust'])$(id).style.display=lobby?'':'none';
+  $('mode').querySelectorAll('[data-m]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===S.mode));
+  if(curMode!==S.mode)setCustom(S.mode);
+  $('seg').innerHTML=packs.map(p=>`<button data-p="${esc(p.id)}" aria-pressed="${S.packId===p.id}">${esc(p.label)}</button>`).join('')+(S.packId==='custom'?'<button aria-pressed="true">Свои вопросы</button>':'');
+  $('seg').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>sock.emit('host:pack',{id:b.dataset.p}));
+  $('bots').value=String(S.players.filter(p=>p.bot).length);
+}
+$('next').onclick=()=>sock.emit('host:next');
+$('reset').onclick=()=>{if(confirm('Обнулить счёт и вернуться в лобби?'))sock.emit('host:reset')};
+$('new').onclick=()=>{if(confirm('Создать новую комнату? Гостям придётся зайти заново.'))create()};
+$('bots').onchange=e=>sock.emit('host:bots',+e.target.value);
+$('fs').onclick=()=>{try{$('tv').requestFullscreen()}catch{}};
+document.addEventListener('keydown',e=>{if(e.target.closest('textarea,input,select'))return;if(e.key===' '||e.key==='ArrowRight'){e.preventDefault();if(!$('next').disabled)sock.emit('host:next')}});
+const CUST={
+  blef:{help:'Первая строка — название праздника. Дальше по одному вопросу в строке: <b>вопрос с пропуском ___ | правда | ложь для ботов; ещё ложь</b>. Ложь для ботов можно не писать.',
+    sample:'Юбилей Ольги Сергеевны\nОльга Сергеевна однажды выиграла в лотерею ___ | живого гуся | путёвку в Сочи; холодильник\nНа первой работе Ольга Сергеевна была ___ | вожатой в лагере'},
+  who:{help:'Первая строка — название праздника. Дальше по одному вопросу в строке, например: <b>Кто скорее всего первым пойдёт танцевать?</b> За игру выпадут 8 случайных вопросов.',
+    sample:'Юбилей Ольги Сергеевны\nКто скорее всего первым пойдёт танцевать?\nКто скорее всего расплачется от тоста?\nКто скорее всего уйдёт домой последним?'}};
+let curMode=null;
+function setCustom(m){curMode=m;$('chelp').innerHTML=CUST[m].help;$('ctext').value=store.get('blef-custom-'+m)||(m==='blef'&&store.get('blef-custom'))||CUST[m].sample;$('cmsg').textContent=''}
+$('mode').querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>sock.emit('host:mode',b.dataset.m));
+$('capply').onclick=()=>{
+  const lines=$('ctext').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(curMode==='who'){const title=lines[0]&&!lines[0].includes('?')?lines.shift():'';
+    sock.emit('host:pack',{custom:{title,qs:lines}},a=>{$('cmsg').textContent=a.ok?`Готово: ${a.n} вопр.`:(a.err||'Не получилось')});
+    store.set('blef-custom-who',$('ctext').value);return}
+  const title=lines[0]&&!lines[0].includes('|')?lines.shift():'';
+  const qs=lines.map(l=>{const[q,truth,lies]=l.split('|').map(x=>(x||'').trim());return{q,truth,lies:(lies||'').split(';').map(x=>x.trim()).filter(Boolean)}}).filter(q=>q.q&&q.truth);
+  sock.emit('host:pack',{custom:{title,qs}},a=>{$('cmsg').textContent=a.ok?`Готово: ${a.n} вопр.`:(a.err||'Не получилось')});
+  store.set('blef-custom-blef',$('ctext').value);
+};
+setCustom('blef');
+}
+</script>
+</body>
+</html>
